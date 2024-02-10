@@ -1,0 +1,54 @@
+% Read temperature, pressure, and humidity data from a ThingSpeak channel over the past 24 hours 
+% to calculate the high and low temperatures and write to another channel. 
+
+% Channel ID to read data from
+readChannelID = 1369889;
+% Field IDs
+TemperatureFieldID = 1;
+PressureFieldID = 2;
+HumidityFieldID = 3;
+% Channel Read API Key
+readAPIKey = 'TI15UDZ38496FELU';
+
+% Read temperature, pressure, and humidity data for the last 24 hours from the channel.
+[tempF, timeStamp] = thingSpeakRead(readChannelID, 'Fields', [TemperatureFieldID, PressureFieldID, HumidityFieldID], ...
+                                                'numDays', 1, 'ReadKey', readAPIKey);
+
+% Calculate the maximum and minimum temperatures
+[maxTempF, maxTempIndex] = max(tempF(:,1));
+[minTempF, minTempIndex] = min(tempF(:,1));
+avgPressure = nanmean(tempF(:,2));
+avgTemperature = nanmean(tempF(:,1));
+avgHumidity = nanmean(tempF(:,3));
+
+% Select the timestamps at which the maximum and minimum temperatures were measured
+timeMaxTemp = timeStamp(maxTempIndex);
+timeMinTemp = timeStamp(minTempIndex);
+
+display(maxTempF, 'Maximum Temperature for the past 24 hours is');
+display(minTempF, 'Minimum Temperature for the past 24 hours is');
+display(avgPressure, 'Average Pressure for the past 24 hours is');
+display(avgTemperature, 'Average Temperature for the past 24 hours is');
+display(avgHumidity, 'Average Humidity for the past 24 hours is');
+
+writeChannelID = 1369893;
+% Enter the Write API Key
+writeAPIKey = 'YMAK01DU9P9V9AOD';
+
+% Write maximum temperature, minimum temperature, average pressure, average temperature, and average humidity to another channel
+thingSpeakWrite(writeChannelID, 'Fields', [3, 4, 2, 1, 5], 'Values', {maxTempF, minTempF, avgPressure, avgTemperature, avgHumidity}, 'WriteKey', writeAPIKey);
+
+alertApiKey = 'TAKP7C5XU9ZEVJ8GFZRXC';
+alertUrl = "https://api.thingspeak.com/alerts/send";
+options = weboptions("HeaderFields", ["ThingSpeak-Alerts-API-Key", alertApiKey]);
+alertSubject = sprintf("Weather Forecast Notification");
+
+if(avgTemperature < 26 && avgHumidity > 80 && avgPressure < 100600)
+    disp('It is expected to rain in 30 mins')
+    alertBody = 'Chennai Weather Prediction today: It is expected to rain in 30 mins';
+    % Send a rain forecast alert
+    webwrite(alertUrl, "body", alertBody, "subject", alertSubject, options);
+else
+    disp('The weather is clear today!')
+    alertBody = 'Chennai Weather Prediction today: The weather is clear today!';
+end
